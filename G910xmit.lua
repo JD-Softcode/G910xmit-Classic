@@ -114,12 +114,19 @@ G910cooldownMark = {}					-- know what's been flagged as on cooldown so won't se
 
 G910healthCodes = {"z", "y", "x", "w"}	--  used to send player health for combat light timing (2.0)
 
+G910colorToTexture = {	R = "01",		-- used by putMsgOnPixels (new in 2.5)
+						G = "02",
+						B = "04",
+						M = "05",
+						C = "06" }
+						
 --G910SuppressCooldowns 				--  saved variable in the .toc (applies across all characters on the same realm)
 --G910UserTimeFactor = 15				--  saved variable in the .toc
 --G910ProfileMemory{}					--  saved variable in the .toc
 
 
 -------------------------- THE SLASH COMMANDS EXECUTE CODE HERE ------------------------
+-- N.B. "self:" is not valid in slash command invokes; use G910xmit:
 
 SlashCmdList["G910CAL"] = function(msg, theEditFrame)		--  /G910calibrate
 	ChatFrame1:AddMessage( "G910xmit is in calibration mode for the next 30 seconds.")
@@ -150,7 +157,7 @@ SlashCmdList["G910RESET"] = function(msg, theEditFrame)		--  /G910reset    Reset
 	G910playerOutOfControlEvent = false
 	G910playerInCombat = false
 	G910loadingScreenActive = false
-	C_Timer.After(1.0, function() self:applyRememberedProfile() end)
+	C_Timer.After(1.0, function() G910xmit:applyRememberedProfile() end)
 end
 
 SlashCmdList["G910CDRESET"] = function(msg, theEditFrame)		--  /G910cdreset    Send full set of action bar status msgs
@@ -532,16 +539,8 @@ function G910xmit:putMsgOnPixels(msg,color)		-- color is nil when this is called
 	--ChatFrame1:AddMessage("putting "..msg.." on the color pixels using color "..tostring(color))
 	local bitmask = 1
 	local texture = "07"			-- use white pixels when color is nil
-	if color     == "R" then 
-		texture = "01" 
-	elseif color == "G" then 
-		texture = "02" 
-	elseif color == "B" then 
-		texture = "04" 
-	elseif color == "M" then 
-		texture = "05" 
-	elseif color == "C" then 
-		texture = "06" 
+	if G910colorToTexture[color] then
+		texture = G910colorToTexture[color] 
 	end
 	local theCode = string.byte(msg)
 	--print("analyzing byte" .. theCode)
@@ -596,12 +595,8 @@ end
 
 
 function G910xmit:healthQuartile(testVal)
-	if testVal < 0.26 then 
-		return 1
-	elseif testVal < 0.51 then 
-		return 2
-	elseif testVal < 0.76 then 
-		return 3
+	if testVal < 1 then
+		return 1 + math.floor(testVal * 4)		-- 0-0.24 is 1;  0.24-0.49 is 2;  etc.
 	else
 		return 4
 	end
