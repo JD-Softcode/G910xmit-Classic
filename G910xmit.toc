@@ -1,7 +1,7 @@
 ## Interface: 11302
-## Title: G910xmit v2.4 for Classic
-## Version: 2.4 for Classic 
-## Notes: Pairs with the WoW G910 application for Mac and PC to synchronize Logitech LED keyboard lights with in-game events.
+## Title: G910xmit v2.5 for Classic
+## Version: 2.5 for Classic
+## Notes: Pairs with |cFF00FFFFWoW G910|r for macOS and WIndows to synchronize Logitech LED keyboard lights with in-game events.
 ## SavedVariables: G910SuppressCooldowns, G910UserTimeFactor, G910ProfileMemory
 ## Author: waldokind@jdsoftcode.net
 ## X-Website: http://www.jdsoftcode.net

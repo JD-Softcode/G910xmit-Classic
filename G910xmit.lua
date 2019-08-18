@@ -98,7 +98,6 @@ G910cinematicMovieMode = false			--  flag to come out of movie mode upon moving
 G910wasMoney = 0						--  used to tell if money is coming in or going out
 G910unspentTalentPoints = 0				--  CLASSIC: used to tell when talent points spent
 G910oldPlayerHealthQuartile = 0			--  used to store and compare player health for combat light timing (2.0)
---G910isAtForge = false					--  used to track if artifact forge is open or closed (1.6 add)
 G910playerOutOfControlEvent = false		--  used as back-up method to prevent short-term inactive ability msgs (1.7 add)
 G910playerInCombat = false				--  used for health pulse rate sending (2.0) and to confirm ok to echo out of combat
 G910loadingScreenActive = true			--  used to temporarily suspend sending messages when WoW zone loading screen is showing
@@ -151,13 +150,14 @@ SlashCmdList["G910RESET"] = function(msg, theEditFrame)		--  /G910reset    Reset
 	G910playerOutOfControlEvent = false
 	G910playerInCombat = false
 	G910loadingScreenActive = false
+	C_Timer.After(1.0, function() self:applyRememberedProfile() end)
 end
 
 SlashCmdList["G910CDRESET"] = function(msg, theEditFrame)		--  /G910cdreset    Send full set of action bar status msgs
 	if G910SuppressCooldowns then
 		ChatFrame1:AddMessage( "G910xmit is set to ignore action bar updates. Type \"/G910actionbars on\" to enable.")
 	else
-		ChatFrame1:AddMessage( "G910xmit: Resetting all keyboard lights for action bars.")
+		ChatFrame1:AddMessage( "G910xmit: Resetting all action bars keyboard lights.")
 		G910suspendCooldownUpdate = true
 		G910xmit:resetTheCooldowns()
 		C_Timer.After(5.0, function() G910suspendCooldownUpdate = false end)
@@ -177,7 +177,7 @@ SlashCmdList["G910PROFILESWAP"] = function(msg, theEditFrame)	--  LEGACY /G910pr
 end
 
 SlashCmdList["G910PROFILE"] = function(msg, theEditFrame)		--  /G910profile X     Switch to lighting profile X
-	if msg and tonumber(msg) then							-- is a number,
+	if msg and tonumber(msg) then							-- if a number,
 		local profileNum = math.floor(tonumber(msg))
 		if (profileNum > 0 and profileNum < 10) then		--        and in the valid range
 			G910xmit:sendMessage(tostring(profileNum))
@@ -253,7 +253,7 @@ end
 function G910xmit:showHelp(name)											-- added in 1.15
 	ChatFrame1:AddMessage ("|cffffff00HELP for WoW G"..name.." and G910xmit.|cff00ff66 Find more at |rwww.jdsoftcode.net/warcraft")
 	ChatFrame1:AddMessage ("|cff00ff66  Type |r/g"..name.."r|cff00ff66 to reset stuck animations.")
-	ChatFrame1:AddMessage ("|cff00ff66  Type |r/g"..name.."cdr|cff00ff66 to reset and resync the cooldown lights.")
+	ChatFrame1:AddMessage ("|cff00ff66  Type |r/g"..name.."cdr|cff00ff66 to reset and resync the action bar ready lights.")
 	ChatFrame1:AddMessage ("|cff00ff66  Type |r/g"..name.."profile #|cff00ff66 to change lighting colors.")
 	ChatFrame1:AddMessage ("|cff00ff66  Type |r/g"..name.."rememberprofile #|cff00ff66 to always switch to the profile for this character.")
 	ChatFrame1:AddMessage ("|cff00ff66  Type |r/g"..name.."time|cff00ff66 to adjust messaging rate.")
@@ -324,8 +324,7 @@ function G910xmit:OnEvent(event, ...)
         self:setupGuardPixels()
         self:guardPixels(0)
         G910wasMoney = GetMoney()
-        G910unspentTalentPoints = UnitCharacterPoints("player")
-        
+        G910unspentTalentPoints = UnitCharacterPoints("player")	-- CLASSIC
         C_Timer.After(1.5, function() self:sendMessage("e") end) -- send message chat field has closed
         G910chatInputOpen = false               				-- and remember it's closed
         G910oldPlayerHealthQuartile = self:healthQuartile( UnitHealth("player") / UnitHealthMax("player") )
@@ -338,9 +337,9 @@ function G910xmit:OnEvent(event, ...)
 			G910ProfileMemory = {}
 		end
 		G910suspendCooldownUpdate = true						-- pause automatic updating
-		C_Timer.After(2.0, function() self:resetTheCooldowns() end)                   -- full, no-blink update after things settle down, else all show not ready
-		C_Timer.After(4.0, function() self:resetTheCooldowns() end)                   -- swapping characters was not updating everything on just 1 call
 		C_Timer.After(1.0, function() self:applyRememberedProfile() end)
+		C_Timer.After(2.0, function() self:resetTheCooldowns() end)                   -- full, no-blink update after things settle down, else all show not ready
+		C_Timer.After(4.5, function() self:resetTheCooldowns() end)                   -- swapping characters was not updating everything on just 1 call
 		C_Timer.After(6.0, function() G910suspendCooldownUpdate = false end)
     elseif event == "LOADING_SCREEN_ENABLED" then           -- new in 2.0 
     	G910suspendCooldownUpdate = true
@@ -559,9 +558,7 @@ end
 
 function G910xmit:sendMessage(message)
 	--print("G910SendMessage with "..message)
-	if message == "T" then						-- have spec change jump ahead of cooldown changes that leak thru
-		G910pendingMessage = message				-- in fact, purge everything else since spec change happens when it's "quiet"
-	elseif (message == "C" or message == "O" or message == "e" ) then  -- prioritize combat status and chat close
+	if (message == "C" or message == "O" or message == "e" ) then  -- prioritize combat status and chat close
 		G910pendingMessage = message .. G910pendingMessage
 	else
 		G910pendingMessage = G910pendingMessage .. message
