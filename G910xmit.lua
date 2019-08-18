@@ -1,4 +1,5 @@
 ﻿--   ## WoW G910 XMIT - ©2016-19 J∆•Softcode (www.jdsoftcode.net) ##
+--   ## WoW Classic Edition										  ##
 
 -------------------------- DEFINE USER SLASH COMMANDS ------------------------
 
@@ -95,9 +96,9 @@ G910chatInputOpen = false				--  flag to know chat window state and if just chan
 G910whisperLight = false				--  flag to not send unnecessary stopChatLights
 G910cinematicMovieMode = false			--  flag to come out of movie mode upon moving
 G910wasMoney = 0						--  used to tell if money is coming in or going out
-G910oldSpecialization = 0				--  used to tell if spec changed or just a talent (new for 7.0)
+G910unspentTalentPoints = 0				--  CLASSIC: used to tell when talent points spent
 G910oldPlayerHealthQuartile = 0			--  used to store and compare player health for combat light timing (2.0)
-G910isAtForge = false					--  used to track if artifact forge is open or closed (1.6 add)
+--G910isAtForge = false					--  used to track if artifact forge is open or closed (1.6 add)
 G910playerOutOfControlEvent = false		--  used as back-up method to prevent short-term inactive ability msgs (1.7 add)
 G910playerInCombat = false				--  used for health pulse rate sending (2.0) and to confirm ok to echo out of combat
 G910loadingScreenActive = true			--  used to temporarily suspend sending messages when WoW zone loading screen is showing
@@ -116,7 +117,7 @@ G910healthCodes = {"z", "y", "x", "w"}	--  used to send player health for combat
 
 --G910SuppressCooldowns 				--  saved variable in the .toc (applies across all characters on the same realm)
 --G910UserTimeFactor = 15				--  saved variable in the .toc
---G910ProfileMemory						--  saved variable in the .toc
+--G910ProfileMemory{}					--  saved variable in the .toc
 
 
 -------------------------- THE SLASH COMMANDS EXECUTE CODE HERE ------------------------
@@ -193,11 +194,9 @@ SlashCmdList["G910REMEMBER"] = function(msg, theEditFrame)	--   /G910rememberpro
 		local profileNum = math.floor(tonumber(msg))
 		if profileNum and (profileNum > 0 and profileNum < 10) then		-- is a number, and in the valid range
 			local playerName = GetUnitName("player", true)		-- get name & should have no realm (saved var is realm unique)
-			local specNow = GetSpecialization()
-			local nameAndSpec = playerName .. tostring(specNow)
-			G910ProfileMemory[nameAndSpec] =  profileNum
+			G910ProfileMemory[playerName] =  profileNum
 			G910xmit:sendMessage(tostring(profileNum))
-			ChatFrame1:AddMessage( "G910xmit: Remembering to show profile "..profileNum.." for "..playerName.." in "..(select(2, GetSpecializationInfo(specNow)) or "no").." spec.")
+			ChatFrame1:AddMessage( "G910xmit: Remembering to show profile "..profileNum.." for "..playerName)
 		else
 			ChatFrame1:AddMessage( "G910xmit: Type \"/G910rememberprofile x\" where x is a number between 1 and 9.")
 		end
@@ -256,7 +255,7 @@ function G910xmit:showHelp(name)											-- added in 1.15
 	ChatFrame1:AddMessage ("|cff00ff66  Type |r/g"..name.."r|cff00ff66 to reset stuck animations.")
 	ChatFrame1:AddMessage ("|cff00ff66  Type |r/g"..name.."cdr|cff00ff66 to reset and resync the cooldown lights.")
 	ChatFrame1:AddMessage ("|cff00ff66  Type |r/g"..name.."profile #|cff00ff66 to change lighting colors.")
-	ChatFrame1:AddMessage ("|cff00ff66  Type |r/g"..name.."rememberprofile #|cff00ff66 to always switch to the profile for this character/spec.")
+	ChatFrame1:AddMessage ("|cff00ff66  Type |r/g"..name.."rememberprofile #|cff00ff66 to always switch to the profile for this character.")
 	ChatFrame1:AddMessage ("|cff00ff66  Type |r/g"..name.."time|cff00ff66 to adjust messaging rate.")
 	ChatFrame1:AddMessage ("|cff00ff66  See main application help on lighting profiles, suspending cooldown updates, and setup calibration.|r")
 end
@@ -278,58 +277,28 @@ end
 -------------------------- PLUG INTO EVENTS OF INTEREST ------------------------
 
 function G910xmit:OnLoad()
-	--print("G910xmit_OnLoad()")
 	local f = G910xmitFrame						-- defined by the XML
 	f:RegisterEvent("PLAYER_ENTERING_WORLD")	-- environment ready
-	
 	f:RegisterEvent("ACTIONBAR_UPDATE_COOLDOWN") -- (sometimes) cooldown for an actionbar or inventory slot starts; v1.15 add
-	
 	f:RegisterEvent("PLAYER_REGEN_ENABLED")		-- out of combat
 	f:RegisterEvent("PLAYER_REGEN_DISABLED")	-- into combat
-	
 	f:RegisterEvent("CINEMATIC_START")			-- Only fires for cinematics using in-game engine, not pre-rendered movies
 	f:RegisterEvent("CINEMATIC_STOP")
 	f:RegisterEvent("PLAY_MOVIE")				-- fires for pre-rendered movies but has no "done with movie" call
-	
 	f:RegisterEvent("PLAYER_MONEY") 			-- player gains or loses money
-
-	f:RegisterEvent("ACHIEVEMENT_EARNED")
 	f:RegisterEvent("PLAYER_LEVEL_UP")
-
 	f:RegisterEvent("PLAYER_ALIVE")  			-- both release from death to a graveyard AND accept a rez before releasing spirit; fires at login too
 	f:RegisterEvent("PLAYER_UNGHOST") 			-- back to life after being a ghost (but not if accept player rez)
 	f:RegisterEvent("PLAYER_DEAD") 				-- player just died
 	f:RegisterEvent("PLAYER_CONTROL_GAINED")	-- try and avoid dimming cooldowns for short-term events; 1.7 add
 	f:RegisterEvent("PLAYER_CONTROL_LOST")
-	
 	f:RegisterEvent("CHAT_MSG_WHISPER")			-- player receives a whisper from another player's character.
 	f:RegisterEvent("CHAT_MSG_BN_WHISPER")		-- Fires when you receive a whisper though Battle.net
 	f:RegisterEvent("CHAT_MSG_BN_WHISPER_INFORM")-- Fires everytime you send a whisper though Battle.net
 	f:RegisterEvent("PLAYER_STARTED_MOVING")	-- started forward/backward/strafe. Not jumping, turning, or taking a taxi.
-	
 	f:RegisterEvent("READY_CHECK")				-- ready check is triggered.
-	f:RegisterEvent("ROLE_POLL_BEGIN")			-- role check is triggered.   v2.0 add
-	--f:RegisterEvent("CHAT_MSG_RAID_WARNING")	-- raid leader raid warning received // no, this will often come at bad times for animation
 	f:RegisterEvent("DUEL_REQUESTED")			-- these next 5 added in 1.6
-	
-	f:RegisterEvent("ACTIVE_TALENT_GROUP_CHANGED")-- player switches talent builds. in WoW 7.0, this triggers every time a talent is changed
 	f:RegisterEvent("HEARTHSTONE_BOUND")
-	
-	f:RegisterEvent("TRANSMOGRIFY_SUCCESS")
-	f:RegisterEvent("ARTIFACT_UPDATE")
-	f:RegisterEvent("ARTIFACT_CLOSE")
-	f:RegisterEvent("AZERITE_ITEM_EXPERIENCE_CHANGED")		--new for WoW 8.0; add in AddOn 2.0
-	f:RegisterEvent("AZERITE_ITEM_POWER_LEVEL_CHANGED")		--new for WoW 8.0; add in AddOn 2.0
-	
-	f:RegisterEvent("AZERITE_ESSENCE_ACTIVATED")			--new for WoW 8.2
-	--f:RegisterEvent("AZERITE_ESSENCE_ACTIVATION_FAILED")	--new for WoW 8.2
-	f:RegisterEvent("AZERITE_ESSENCE_CHANGED")				--new for WoW 8.2
-	f:RegisterEvent("AZERITE_ESSENCE_FORGE_CLOSE")			--new for WoW 8.2
-	f:RegisterEvent("AZERITE_ESSENCE_FORGE_OPEN")			--new for WoW 8.2
-	f:RegisterEvent("AZERITE_ESSENCE_MILESTONE_UNLOCKED")	--new for WoW 8.2
-	--f:RegisterEvent("AZERITE_ESSENCE_UPDATE")				--new for WoW 8.2
-	--f:RegisterEvent("PENDING_AZERITE_ESSENCE_CHANGED")		--new for WoW 8.2
-		
 	f:RegisterEvent("LOADING_SCREEN_ENABLED")		--add in AddOn 2.0
 	f:RegisterEvent("LOADING_SCREEN_DISABLED")		--add in AddOn 2.0
 
@@ -351,13 +320,12 @@ function G910xmit:OnEvent(event, ...)
 		return
 	end
     if event == "PLAYER_ENTERING_WORLD" then        -- set stuff up
-    	--print("PLAYER_ENTERING_WORLD")
         G910xmitFrame:Show()
         self:setupGuardPixels()
         self:guardPixels(0)
         G910wasMoney = GetMoney()
-        G910oldSpecialization = GetSpecialization()
-        G910isAtForge = false   
+        G910unspentTalentPoints = UnitCharacterPoints("player")
+        
         C_Timer.After(1.5, function() self:sendMessage("e") end) -- send message chat field has closed
         G910chatInputOpen = false               				-- and remember it's closed
         G910oldPlayerHealthQuartile = self:healthQuartile( UnitHealth("player") / UnitHealthMax("player") )
@@ -369,7 +337,11 @@ function G910xmit:OnEvent(event, ...)
         if G910ProfileMemory == nil then	-- prevent errors reading the index of a non-array variable if never been set
 			G910ProfileMemory = {}
 		end
-        -- Initial cooldown setup handled by initial talent event sent my game
+		G910suspendCooldownUpdate = true						-- pause automatic updating
+		C_Timer.After(2.0, function() self:resetTheCooldowns() end)                   -- full, no-blink update after things settle down, else all show not ready
+		C_Timer.After(4.0, function() self:resetTheCooldowns() end)                   -- swapping characters was not updating everything on just 1 call
+		C_Timer.After(1.0, function() self:applyRememberedProfile() end)
+		C_Timer.After(6.0, function() G910suspendCooldownUpdate = false end)
     elseif event == "LOADING_SCREEN_ENABLED" then           -- new in 2.0 
     	G910suspendCooldownUpdate = true
         G910loadingScreenActive = true
@@ -399,9 +371,6 @@ function G910xmit:OnEvent(event, ...)
         G910playerInCombat = false
 		C_Timer.After(5.0, function() if G910playerInCombat==false then self:sendMessage("O") end end)
 				-- after 5 seconds, send it again (1.14 add, out in 2.0, back in on 2.1)
-    elseif event == "TRANSMOGRIFY_SUCCESS" then     -- added in 1.6
-        self:searchAndDestroy("J")                       -- added in 1.8 to stop multiple plays (one sent for each item xmogged)
-        self:sendMessage("J")
     elseif event == "PLAYER_MONEY" then
         local moneyGain = GetMoney() - G910wasMoney
         if     (moneyGain <= -10000)                      then self:sendMessage("g")
@@ -412,8 +381,6 @@ function G910xmit:OnEvent(event, ...)
         else                                                   self:sendMessage("G")
         end
         G910wasMoney = GetMoney()
-    elseif event == "ACHIEVEMENT_EARNED" then       -- a cheesement
-        self:sendMessage("A")
     elseif event == "PLAYER_LEVEL_UP" then          -- Ding!
         self:sendMessage("A")
     elseif event == "PLAYER_DEAD" then              -- Stood in the fire
@@ -431,10 +398,6 @@ function G910xmit:OnEvent(event, ...)
         self:sendMessage("H")
     elseif event == "DUEL_REQUESTED" then           -- added in 1.6
         self:sendMessage("H")
-    elseif event == "ROLE_POLL_BEGIN" then          -- added in 2.0
-        self:sendMessage("r")
-    --elseif event == "CHAT_MSG_RAID_WARNING" then  -- added in 2.0   There is too much going on during a fight for a /rw on keyboard lights to work well
-    --    self:sendMessage("f")
     elseif event == "HEARTHSTONE_BOUND" then        -- added in 1.6
         self:sendMessage("h")
     elseif event == "CINEMATIC_START" then          -- Into a movie -- fires for new character in-game movie, garrison building reveal, etc.
@@ -449,28 +412,6 @@ function G910xmit:OnEvent(event, ...)
         if G910cinematicMovieMode == false then         -- don't send second darken signal if one already went (player might stack movie plays)
             self:sendMessage("W")
             G910cinematicMovieMode = true
-        end
-    elseif event == "ACTIVE_TALENT_GROUP_CHANGED" then-- changed spec; major overhaul in 1.15
-        --print("ACTIVE_TALENT_GROUP_CHANGED "..arg1.."  "..arg2)
-        if (arg2==0) then                           -- arg2 == 0 only upon initial character login to the game world
-            G910suspendCooldownUpdate = true						-- pause automatic updating
-            C_Timer.After(2.0, function() self:resetTheCooldowns() end)                   -- full, no-blink update after things settle down, else all show not ready
-            C_Timer.After(4.0, function() self:resetTheCooldowns() end)                   -- swapping characters was not updating everything on just 1 call
-            C_Timer.After(1.0, function() self:applyRememberedProfile() end)
-            C_Timer.After(6.0, function() G910suspendCooldownUpdate = false end)
-        else
-            local specNow = GetSpecialization()
-            --print("  specNow = "..specNow.."  G910oldSpecialization = "..G910oldSpecialization)
-            if specNow ~= G910oldSpecialization then        -- if the actual spec has changed and not just a talent,
-            	C_Timer.After(0.01, function() self:sendMessage("T") end)       -- play the animation. Calling directly often failed due to more C_Timers immediately after
-                G910suspendCooldownUpdate = true			-- pause automatic updating
-                C_Timer.After(2.1, function() self:resetTheCooldowns() end)       -- catch some early ones right after animation to show progress
-	            C_Timer.After(1.0, function() self:applyRememberedProfile() end)
-                C_Timer.After(4.5, function() self:resetTheCooldowns() end)       -- show more progress
-                C_Timer.After(8.0, function() self:resetTheCooldowns() end)       -- certain spells take a long time to show ready
-                C_Timer.After(10.1, function() G910suspendCooldownUpdate = false end)
-    	        G910oldSpecialization = specNow
-            end
         end
     elseif event == "ACTIONBAR_UPDATE_COOLDOWN" then    -- added in 1.15; this really doesn't fire like the API description says
 		self:updateTheCooldowns()
@@ -490,45 +431,6 @@ function G910xmit:OnEvent(event, ...)
             self:sendMessage("i")
             G910whisperLight = false
         end
-    elseif event == "ARTIFACT_UPDATE" then          -- added in 1.6
-        if C_ArtifactUI.IsAtForge() then        -- Only if player is currently at the forge...
-            if G910isAtForge then               -- if this update is happening while the forge is open
-		-- Code Removed; since WoW 8.0, Legion artifact weapons cannot be upgraded
-            else                                -- if we were not previously at the forge, play opening forge animation
-                self:sendMessage("F")
-                G910isAtForge = true
-            end
-        end
-    elseif event == "ARTIFACT_CLOSE" then           -- added in 1.6
-        if G910isAtForge then               -- if we were at the forge, then play animation
-            self:sendMessage("f")
-            G910isAtForge = false
-        end
-    elseif event == "AZERITE_ITEM_POWER_LEVEL_CHANGED" then     -- when the necklace levels up
-        self:sendMessage("n")
-    elseif event == "AZERITE_ITEM_EXPERIENCE_CHANGED" then      -- every time the necklace XP bar moves
-        self:sendMessage("N")
-        
-    elseif event == "AZERITE_ESSENCE_ACTIVATED" then	-- new ability dropped onto center of necklace
-    	print("AZERITE_ESSENCE_ACTIVATED  arg1 = "..arg1)
-        self:sendMessage("n")
-    --elseif event == "AZERITE_ESSENCE_ACTIVATION_FAILED" then
-    --	print("AZERITE_ESSENCE_ACTIVATION_FAILED")
-    elseif event == "AZERITE_ESSENCE_CHANGED" then
-    	print("AZERITE_ESSENCE_CHANGED")
-    elseif event == "AZERITE_ESSENCE_FORGE_CLOSE" then
-    	--print("AZERITE_ESSENCE_FORGE_CLOSE")
-        self:sendMessage("f")
-    elseif event == "AZERITE_ESSENCE_FORGE_OPEN" then
-    	--print("AZERITE_ESSENCE_FORGE_OPEN")
-        self:sendMessage("F")
-    elseif event == "AZERITE_ESSENCE_MILESTONE_UNLOCKED" then
-    	print("AZERITE_ESSENCE_MILESTONE_UNLOCKED")
-    --elseif event == "AZERITE_ESSENCE_UPDATE" then
-    --	print("AZERITE_ESSENCE_UPDATE")
-    --elseif event == "PENDING_AZERITE_ESSENCE_CHANGED" then
-    --	print("PENDING_AZERITE_ESSENCE_CHANGED")
-        
     end
 end
 
@@ -592,6 +494,14 @@ function G910xmit:OnUpdate(elapsed)
 	if now > G910cooldownUpdateTimer then
 		self:updateTheCooldowns()
 		G910cooldownUpdateTimer = now + G910updateCooldownsInterval 	-- update cooldowns periodically
+		-- CLASSIC: Also use this once-per-second loop to notice when talents spent
+		local unspentNow = UnitCharacterPoints("player")
+		if unspentNow ~= G910unspentTalentPoints then
+			if unspentNow < G910unspentTalentPoints then
+				C_Timer.After(0.01, function() self:sendMessage("T") end)
+			end
+			G910unspentTalentPoints = unspentNow
+		end
 	end
 	-- Periodically update the health % of the player if in combat
 	if (G910playerInCombat == true) and (now > G910healthUpdateTimer) then
@@ -614,17 +524,6 @@ function G910xmit:handleCalibrationCountdown(elapsed)
 		ChatFrame1:AddMessage( "G910xmit is now out of calibration mode.")
 		G910inCalibrationMode = 0
 	end
-end
-
-
-function G910xmit:searchAndDestroy(theMsg)		-- retuns true if theMsg found and removed
-	local count = 0
-	local wasFound = false
-	G910pendingMessage, count = string.gsub(G910pendingMessage, theMsg, "", 1)	-- replace one of theMsg with nothing
-	if count > 0 then
-		wasFound = true
-	end
-	return wasFound
 end
 
 
@@ -691,7 +590,7 @@ end
 -------------------------- TO ADJUST COMBAT PULSE RATE  ------------------------
 
 function G910xmit:checkAndSendHealthPulseRateUpdate()
-	local newQuartile = self:healthQuartile (  (UnitHealth("player") + UnitGetTotalAbsorbs("player") ) / UnitHealthMax("player") )
+	local newQuartile = self:healthQuartile (  UnitHealth("player") / UnitHealthMax("player") )
 	if newQuartile ~= G910oldPlayerHealthQuartile then 
 		self:sendMessage(G910healthCodes[newQuartile])
 		G910oldPlayerHealthQuartile = newQuartile
@@ -784,8 +683,6 @@ function G910xmit:shouldTheCooldownsBeSuspended()
 	     UnitOnTaxi("player") or
 	     C_LossOfControl.GetNumEvents() > 0 or
 	     UnitIsDeadOrGhost("player") or
-	     HasVehicleActionBar() or				-- these 3 adds in 1.10 from Tuller and zork on the wowinterface.com forums
-	     HasOverrideActionBar() or						-- this for Darkmoon Fair cannon & shooting gallery
 	     HasTempShapeshiftActionBar() ) then 
 	     	suspendThem = true 
 	end
@@ -850,9 +747,7 @@ end
 
 function G910xmit:applyRememberedProfile()
 	local playerName = GetUnitName("player", true)
-	local specNow = GetSpecialization()
-	local nameAndSpec = playerName .. tostring(specNow)
-	local newProfile = G910ProfileMemory[nameAndSpec]	-- will be nil if this table index does not exist
+	local newProfile = G910ProfileMemory[playerName]	-- will be nil if this table index does not exist
 	if newProfile and newProfile > 0 and newProfile < 10 then
 		self:sendMessage(tostring(newProfile))
 	end
