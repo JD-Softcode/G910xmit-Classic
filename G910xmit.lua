@@ -1,4 +1,4 @@
-﻿--   ## WoW G910 XMIT - ©2016-19 J∆•Softcode (www.jdsoftcode.net) ##
+﻿--   ## WoW G910 XMIT - ©2016-20 J∆•Softcode (www.jdsoftcode.net) ##
 --   ## WoW Classic Edition										  ##
 
 -------------------------- DEFINE USER SLASH COMMANDS ------------------------
@@ -84,6 +84,32 @@ SLASH_G910HELP552  	   = "/G512help"
 SLASH_G910TIME6		   = "/G512time"
 SLASH_G910PROFILE6     = "/G512profile"
 SLASH_G910REMEMBER6	   = "/G512rememberprofile"
+
+SLASH_G910CAL8         = "/G815cal"
+SLASH_G910RESET8       = "/G815r"
+SLASH_G910CDRESET8     = "/G815cdr"
+SLASH_G910PROFILE17    = "/G815profile1"	
+SLASH_G910PROFILE27    = "/G815profile2"	
+SLASH_G910PROFILESWAP7 = "/G815profileswap"	
+SLASH_G910ACTIONBARS7  = "/G815actionbars"	
+SLASH_G910HELP881  	   = "/G815"		
+SLASH_G910HELP882  	   = "/G815help"	
+SLASH_G910TIME7		   = "/G815time"
+SLASH_G910PROFILE7     = "/G815profile"
+SLASH_G910REMEMBER7	   = "/G815rememberprofile"
+
+SLASH_G910CAL9         = "/G915cal"
+SLASH_G910RESET9       = "/G915r"
+SLASH_G910CDRESET9     = "/G915cdr"
+SLASH_G910PROFILE18    = "/G915profile1"	
+SLASH_G910PROFILE28    = "/G915profile2"	
+SLASH_G910PROFILESWAP8 = "/G915profileswap"	
+SLASH_G910ACTIONBARS8  = "/G915actionbars"	
+SLASH_G910HELP991  	   = "/G915"		
+SLASH_G910HELP992  	   = "/G915help"	
+SLASH_G910TIME8		   = "/G915time"
+SLASH_G910PROFILE8     = "/G915profile"
+SLASH_G910REMEMBER8	   = "/G915rememberprofile"
 
 
 -------------------------- ADD-ON GLOBALS ------------------------
@@ -196,19 +222,31 @@ SlashCmdList["G910PROFILE"] = function(msg, theEditFrame)		--  /G910profile X   
 	end
 end
 
-SlashCmdList["G910REMEMBER"] = function(msg, theEditFrame)	--   /G910rememberprofile X    Always apply X when this char/spec logs in
+SlashCmdList["G910REMEMBER"] = function(msg, theEditFrame)	--   /G910rememberprofile X    Always apply X when this char logs in
 	if msg and tonumber(msg) then							-- is a number,
 		local profileNum = math.floor(tonumber(msg))
 		if profileNum and (profileNum > 0 and profileNum < 10) then		-- is a number, and in the valid range
-			local playerName = GetUnitName("player", true)		-- get name & should have no realm (saved var is realm unique)
+			local playerName = GetUnitName("player", true)		-- get name & should have no realm (assuming saved var is realm unique)
 			G910ProfileMemory[playerName] =  profileNum
 			G910xmit:sendMessage(tostring(profileNum))
 			ChatFrame1:AddMessage( "G910xmit: Remembering to show profile "..profileNum.." for "..playerName)
 		else
 			ChatFrame1:AddMessage( "G910xmit: Type \"/G910rememberprofile x\" where x is a number between 1 and 9.")
 		end
-	else
-			ChatFrame1:AddMessage( "G910xmit: Type \"/G910rememberprofile x\" where x is a number between 1 and 9.")
+	else		-- if the command is used without a numeric argument, show memorized table
+		if G910ProfileMemory == nil then
+			ChatFrame1:AddMessage( "G910xmit: No lighting profiles memorized.\nTo add, type \"/G910rememberprofile x\" where x is a number between 1 and 9.")
+		else
+			ChatFrame1:AddMessage( "WoW G910 memorized lighting profiles:")
+			local arrayCopyForSort = {}
+			for characterDescriptor, profileNum in pairs(G910ProfileMemory) do
+				table.insert(arrayCopyForSort, {name = characterDescriptor, theProfile = profileNum } )
+			end
+			table.sort(arrayCopyForSort, function(a,b) return a.name < b.name end)  -- sort by name from A to Z
+			for i = 1,#arrayCopyForSort do
+				ChatFrame1:AddMessage( "   Profile "..arrayCopyForSort[i].theProfile.." used for "..arrayCopyForSort[i].name)	
+			end
+		end
 	end
 end
 
@@ -255,6 +293,14 @@ end
 
 SlashCmdList["G910HELP55"] = function(msg, theEditFrame)			-- in-game AddOn help
 	G910xmit:showHelp("512")
+end
+
+SlashCmdList["G910HELP88"] = function(msg, theEditFrame)			-- in-game AddOn help
+	G910xmit:showHelp("815")
+end
+
+SlashCmdList["G910HELP99"] = function(msg, theEditFrame)			-- in-game AddOn help
+	G910xmit:showHelp("915")
 end
 
 function G910xmit:showHelp(name)											-- added in 1.15
@@ -304,7 +350,7 @@ function G910xmit:OnLoad()
 	f:RegisterEvent("CHAT_MSG_BN_WHISPER_INFORM")-- Fires everytime you send a whisper though Battle.net
 	f:RegisterEvent("PLAYER_STARTED_MOVING")	-- started forward/backward/strafe. Not jumping, turning, or taking a taxi.
 	f:RegisterEvent("READY_CHECK")				-- ready check is triggered.
-	f:RegisterEvent("DUEL_REQUESTED")			-- these next 5 added in 1.6
+	f:RegisterEvent("DUEL_REQUESTED")
 	f:RegisterEvent("HEARTHSTONE_BOUND")
 	f:RegisterEvent("LOADING_SCREEN_ENABLED")		--add in AddOn 2.0
 	f:RegisterEvent("LOADING_SCREEN_DISABLED")		--add in AddOn 2.0
