@@ -1,6 +1,6 @@
-## Interface: 11303
-## Title: G910xmit v2.6 for Classic
-## Version: 2.6 for Classic
+## Interface: 11304
+## Title: G910xmit v2.7 for Classic
+## Version: 2.7 for Classic
 ## Notes: Pairs with |cFF00FFFFWoW G910|r for macOS and Windows to synchronize Logitech LED keyboard lights with in-game events.
 ## SavedVariables: G910SuppressCooldowns, G910UserTimeFactor, G910ProfileMemory
 ## Author: waldokind@jdsoftcode.net
